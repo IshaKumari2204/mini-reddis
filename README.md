@@ -151,6 +151,7 @@ alice
 1
 ```
 
+
 Exact output depends on the implementation details in the command classes and test cases.
 
 ## Troubleshooting
@@ -161,9 +162,11 @@ If you see issues while building:
 2. Ensure Maven is installed and on your `PATH`.
 3. Run:
 
+
 ```bash
 mvn clean test
 ```
+
 
 4. Check for Java version compatibility in `pom.xml`.
 
