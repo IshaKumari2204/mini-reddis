@@ -1,23 +1,23 @@
 package miniredis.expiration;
 
+import miniredis.storage.DelayedKey;
 import miniredis.storage.KeyValueStore;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ExpiryManager {
     private final KeyValueStore store;
-    private final long intervalMillis;
     private final Thread cleanerThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     public ExpiryManager(KeyValueStore store) {
-        this(store, 1000L);
+        this.store = store;
+        this.cleanerThread = new Thread(this::runCleanupLoop, "mini-redis-expiry-cleaner");
+        this.cleanerThread.setDaemon(true);
     }
 
     public ExpiryManager(KeyValueStore store, long intervalMillis) {
-        this.store = store;
-        this.intervalMillis = Math.max(50L, intervalMillis);
-        this.cleanerThread = new Thread(this::runCleanupLoop, "mini-redis-expiry-cleaner");
+        this(store);
     }
 
     public void start() {
@@ -34,8 +34,9 @@ public class ExpiryManager {
     private void runCleanupLoop() {
         while (running.get()) {
             try {
-                Thread.sleep(intervalMillis);
-                store.removeExpired();
+                // Blocks efficiently until the next key expires! Zero CPU polling!
+                DelayedKey delayedKey = store.getDelayQueue().take();
+                store.removeIfExpired(delayedKey);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
