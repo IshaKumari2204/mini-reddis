@@ -116,21 +116,10 @@ public class KeyValueStore {
     }
 
     public void removeExpired() {
-        // Poll expired items from DelayQueue without blocking
+        // Non-blocking poll of all ready-to-expire keys in DelayQueue
         DelayedKey delayedKey;
         while ((delayedKey = delayQueue.poll()) != null) {
             removeIfExpired(delayedKey);
-        }
-
-        // Fallback: sweep store for any expired entries
-        synchronized (this) {
-            Iterator<Map.Entry<String, ValueEntry>> iterator = store.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, ValueEntry> entry = iterator.next();
-                if (entry.getValue() != null && entry.getValue().isExpired()) {
-                    iterator.remove();
-                }
-            }
         }
     }
 
