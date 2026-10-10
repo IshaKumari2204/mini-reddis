@@ -1,15 +1,18 @@
 package miniredis.storage;
 
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.DelayQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class KeyValueStore {
     private final Map<String, ValueEntry> store;
     private final DelayQueue<DelayedKey> delayQueue;
+    private final Map<String, Long> activeLeases;
+    private final AtomicLong tokenSequence;
 
     public KeyValueStore() {
         this(Long.MAX_VALUE);
@@ -23,6 +26,8 @@ public class KeyValueStore {
             }
         };
         this.delayQueue = new DelayQueue<>();
+        this.activeLeases = new HashMap<>();
+        this.tokenSequence = new AtomicLong(1);
     }
 
     public void put(String key, String value) {
@@ -54,6 +59,7 @@ public class KeyValueStore {
     }
 
     public synchronized boolean delete(String key) {
+        activeLeases.remove(key);
         return store.remove(key) != null;
     }
 
@@ -136,5 +142,22 @@ public class KeyValueStore {
             store.clear();
         }
         delayQueue.clear();
+    }
+
+    public Long getWithLease(String key) {
+        long token = tokenSequence.incrementAndGet();
+        activeLeases.put(key, token);
+        return token;
+    }
+
+    public synchronized boolean putWithLease(String key, String value, long leaseToken) {
+        Long activeToken = activeLeases.get(key);
+
+        if (activeToken != null && activeToken == leaseToken) {
+            store.put(key, new ValueEntry(value));
+            activeLeases.remove(key);
+            return true;
+        }
+        return false;
     }
 }
